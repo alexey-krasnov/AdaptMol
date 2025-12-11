@@ -1,3 +1,7 @@
+# Portions of this file are based on code from [项目名称]
+# Copyright (c) 2022 Yujie Qian
+# Licensed under MIT License
+
 import os
 import sys
 import time
