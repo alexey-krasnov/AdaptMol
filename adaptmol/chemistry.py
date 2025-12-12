@@ -963,22 +963,22 @@ def _convert_graph_to_smiles_with_chirality_fix(coords, symbols, edges, abb=None
             ratio = width / height
             coords = [[x * ratio * 10, y * 10] for x, y in coords]
         
-        # Step 1: Store chirality information before any modifications
+        
         chirality_bonds = _store_chirality_bonds(mol, coords)
         
-        # Step 2: Your original verification (this sets initial chirality)
+        
         mol = _verify_chirality(mol, coords, symbols, edges, debug)
         
-        # molblock is obtained before expanding func groups
+        
         pred_molblock = Chem.MolToMolBlock(mol)
         
-        # Step 3: Expand functional groups
+        
         pred_smiles, mol = _expand_functional_group(mol, {}, debug, abb=abb)
         
-        # Step 4: Resolve abbreviations  
+        
         mol = resolve_abbreviations_simplified(mol, abb)
         
-        # Step 5: Transfer chirality to expanded molecule
+       
         mol = _transfer_chirality_to_expanded_mol(mol, chirality_bonds, coords, debug)
         
         pred_smiles = Chem.MolToSmiles(mol) 
