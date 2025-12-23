@@ -656,7 +656,7 @@ def build_mol_paths(data_path, image_names, dataset_type):
     return mol_paths
 def getabbr():
     abbreviations_smiles_mapping= {}
-    with open( "/home/feng/cheminfo/githubversion/current/adaptmol/abbreviations.json", "r") as file:
+    with open( "adaptmol/abbreviations.json", "r") as file:
         abbreviations_smiles = json.load(file)
         for abbreviation, smiles in abbreviations_smiles.items():
             
