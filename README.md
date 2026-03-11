@@ -27,10 +27,14 @@ Download our pretrained model from: [model](https://huggingface.co/fffh1/AdaptMo
 conda env create -f environment.yml
 conda activate adaptmol
 ```
-
-
-
 ### Option 2: Docker 
+We are using Python 3.8 
+```bash
+pip install -r requirements.txt
+```
+
+
+### Option 3: Docker 
 
 Make sure [Docker Desktop](https://www.docker.com/products/docker-desktop/) is installed, then:
 
@@ -38,6 +42,7 @@ Make sure [Docker Desktop](https://www.docker.com/products/docker-desktop/) is i
 docker-compose up --build -d
 docker exec -it adaptmol bash
 ```
+
 
 
 ## Usage
