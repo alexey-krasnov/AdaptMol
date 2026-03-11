@@ -41,7 +41,15 @@ class LabelSmoothingLoss(nn.Module):
 
 
 class SequenceLoss(nn.Module):
+    """
+    Cross-entropy or label-smoothing loss for sequence prediction.
 
+    Args:
+        label_smoothing (float): Smoothing factor; 0 disables smoothing.
+        vocab_size (int): Target vocabulary size.
+        ignore_index (int): Token index to ignore in loss. Default -100.
+        ignore_indices (list[int]): Additional indices to mask out. Default [].
+    """
     def __init__(self, label_smoothing, vocab_size, ignore_index=-100, ignore_indices=[]):
         super(SequenceLoss, self).__init__()
         if ignore_indices:
@@ -72,6 +80,10 @@ class SequenceLoss(nn.Module):
 
 
 class GraphLoss(nn.Module):
+    """
+    Weighted cross-entropy loss for bond type (edge) prediction,
+    with optional MMD regularization between labeled and unlabeled outputs.
+    """
     def __init__(self):
         super(GraphLoss, self).__init__()
         weight = torch.ones(7) * 10
@@ -85,6 +97,17 @@ class GraphLoss(nn.Module):
         self.mmd_weight = 0.1  
         self.epoch = 0
     def compute_mmd(self, outputs, targets, outputs_unlabeled=None):
+        """
+        Compute MMD regularization loss between labeled and unlabeled predictions.
+
+        Args:
+            outputs (dict): Labeled model outputs containing 'edges'.
+            targets (dict): Ground-truth labels containing 'edges'.
+            outputs_unlabeled (dict, optional): Unlabeled model outputs. Default None.
+
+        Returns:
+            dict: {'mmd': loss_tensor} if MMD is computed, else {}.
+        """
         
         results = {}
         if outputs_unlabeled is not None:
@@ -121,7 +144,12 @@ class GraphLoss(nn.Module):
         return results
 
     def _compute_mmd_loss(self, gt_outputs, gt_targets, pred_outputs, ignore_index=-100):
-        
+        """
+        Compute per-class MMD loss between GT and unlabeled edge feature distributions.
+
+        Returns:
+            Tensor | None: Scalar MMD loss, or None if insufficient samples.
+        """
        
         if ('edges' not in gt_outputs) or ('edges' not in pred_outputs) or ('edges' not in pred_outputs['edges']):
             return None
@@ -229,7 +257,17 @@ class GraphLoss(nn.Module):
             return None
 
     def _stable_mmd_for_gelu(self, x, y, class_id):
+        """
+        Compute MMD between two feature sets using multiple RBF kernels.
 
+        Args:
+            x (Tensor): GT features of shape (N, D).
+            y (Tensor): Predicted features of shape (M, D).
+            class_id (int): Bond class id, used to select kernel bandwidths.
+
+        Returns:
+            Tensor | None: Scalar MMD value, or None if computation is unstable.
+        """
         n = min(50, x.size(0), y.size(0))
         if x.size(0) > n:
             x = x[:n]
@@ -298,7 +336,13 @@ class GraphLoss(nn.Module):
 
 
 class Criterion(nn.Module):
+    """
+    Composite loss module combining per-format sequence and graph losses.
 
+    Args:
+        args: Training arguments with 'formats' and 'label_smoothing'.
+        tokenizer (dict): Format-keyed tokenizer instances.
+    """
     def __init__(self, args, tokenizer):
         super(Criterion, self).__init__()
         criterion = {}

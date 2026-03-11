@@ -10,7 +10,7 @@ from rdkit import Chem
 import math 
 @dataclass
 class Atom:
-    
+    """Represents an atom parsed from a MOL file atom block."""
     index: int
     x: float
     y: float
@@ -32,7 +32,7 @@ class Atom:
 
 @dataclass
 class Bond:
-    
+    """Represents a bond parsed from a MOL file bond block."""
     index: int
     atom1: int
     atom2: int
@@ -45,7 +45,7 @@ class Bond:
 
 @dataclass
 class MolData:
-    
+    """Parsed contents of a MOL file including header, atoms, bonds, and properties."""
     header: List[str]
     counts_line: str
     atoms: List[Atom]
@@ -55,7 +55,15 @@ class MolData:
 
 
 def parse_mol_file(mol_path: str) -> Optional[MolData]:
-    
+    """
+    Parse a MOL file into a MolData object.
+
+    Args:
+        mol_path (str): Path to the MOL file.
+
+    Returns:
+        MolData | None: Parsed mol data, or None if file is missing, empty, or malformed.
+    """
     try:
         
         if not os.path.exists(mol_path):
@@ -188,7 +196,16 @@ def parse_mol_file(mol_path: str) -> Optional[MolData]:
 
 
 def parse_atom_line(line: str, index: int) -> Optional[Atom]:
-    
+    """
+    Parse a single atom block line from a MOL file.
+
+    Args:
+        line (str): Raw atom line string.
+        index (int): 1-based atom index.
+
+    Returns:
+        Atom | None: Parsed Atom object, or None on failure.
+    """
     try:
        
         fields = line.split()
@@ -327,7 +344,16 @@ def parse_atom_line(line: str, index: int) -> Optional[Atom]:
 
 
 def parse_bond_line(line: str, index: int) -> Optional[Bond]:
-    
+    """
+    Parse a single bond block line from a MOL file.
+
+    Args:
+        line (str): Raw bond line string.
+        index (int): 1-based bond index.
+
+    Returns:
+        Bond | None: Parsed Bond object, or None on failure.
+    """
     try:
         if len(line) < 9:  
             return None
@@ -364,7 +390,17 @@ def parse_bond_line(line: str, index: int) -> Optional[Bond]:
 
 
 def parse_property_line(line):
-    
+    """
+    Parse an M-block property line from a MOL file.
+
+    Supports CHG (charge), RAD (radical), ISO (isotope), and END.
+
+    Args:
+        line (str): Raw property line starting with 'M '.
+
+    Returns:
+        tuple[str | None, Any]: Property type key and parsed value dict, or (None, None) on failure.
+    """
     try:
         if not line.startswith('M '):
             return None, None
@@ -440,7 +476,16 @@ def parse_property_line(line):
 
 
 def atom_to_dict(atom: Atom, properties: Dict[str, Any] = None) -> Dict[str, Any]:
-    
+    """
+    Convert an Atom object to a dictionary, merging in any relevant M-block properties.
+
+    Args:
+        atom (Atom): Parsed atom object.
+        properties (dict, optional): Parsed M-block properties from the MOL file.
+
+    Returns:
+        dict: Atom fields plus any applicable charge, radical, isotope, and alias properties.
+    """
     atom_dict = {
         'index': atom.index,
         'symbol': atom.symbol,
@@ -490,7 +535,15 @@ def atom_to_dict(atom: Atom, properties: Dict[str, Any] = None) -> Dict[str, Any
 
 
 def bond_to_dict(bond: Bond) -> Dict[str, Any]:
-   
+    """
+    Convert a Bond object to a dictionary with human-readable type and stereo names.
+
+    Args:
+        bond (Bond): Parsed bond object.
+
+    Returns:
+        dict: Bond fields including bond_type_name and bond_stereo_name.
+    """
     bond_type_names = {1: 'single', 2: 'double', 3: 'triple', 4: 'aromatic'}
     bond_stereo_names = {0: 'not_stereo', 1: 'up', 4: 'either', 6: 'down', 3: 'cis_trans'}
     
@@ -515,6 +568,16 @@ def check_key(k,dic):
 
 
 def get_mol(record):
+    """
+    Post-process atom symbol fields in a parsed mol record, applying charges,
+    isotopes, aliases, mapping numbers, and bracket notation as needed.
+
+    Args:
+        record (dict): Mol record with 'atoms' and 'bonds' lists.
+
+    Returns:
+        dict: Updated record with modified atom 'symbol' fields.
+    """
     atoms = record["atoms"]
     bonds = record["bonds"]
     for a in atoms:
@@ -593,7 +656,16 @@ def get_mol(record):
     return record
 
 def process_csv_mol_data(mol_path):
-                       
+    """
+    Parse a MOL file and return a structured record with atoms, bonds, and metadata.
+
+    Args:
+        mol_path (str): Path to the MOL file.
+
+    Returns:
+        dict: Record with keys 'atoms', 'bonds', 'mol_data', 'status',
+              'atom_count', 'bond_count', and 'mol_path'.
+    """                    
     
     record = {
     
@@ -632,6 +704,18 @@ from dataclasses import dataclass
 import numpy as np
 
 def sort_coords_and_update_bonds(coords_list, label_list, bonds_dict_list):
+    """
+    Sort atoms by (y, x) coordinate order and update bond atom indices accordingly.
+
+    Args:
+        coords_list (list): Atom (x, y) coordinates.
+        label_list (list[str]): Atom symbol labels.
+        bonds_dict_list (list[dict]): Bond records with 1-based 'atom1' and 'atom2' indices.
+
+    Returns:
+        tuple[list, list[str], list[dict]]: Sorted coordinates, labels, and updated bond dicts
+                                            with 0-based atom indices.
+    """
     coords_array = np.array(coords_list)
     
     

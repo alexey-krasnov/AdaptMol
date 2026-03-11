@@ -14,62 +14,19 @@ from SmilesPE.pretokenizer import atomwise_tokenizer
 from .constants import RGROUP_SYMBOLS, ABBREVIATIONS, VALENCES, FORMULA_REGEX
 
 
-def is_valid_mol(s, format_='atomtok'):
-    if format_ == 'atomtok':
-        mol = Chem.MolFromSmiles(s)
-    elif format_ == 'inchi':
-        if not s.startswith('InChI=1S'):
-            s = f"InChI=1S/{s}"
-        mol = Chem.MolFromInchi(s)
-    else:
-        raise NotImplemented
-    return mol is not None
-
-
-def _convert_smiles_to_inchi(smiles):
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        inchi = Chem.MolToInchi(mol)
-    except:
-        inchi = None
-    return inchi
-
-
-def convert_smiles_to_inchi(smiles_list, num_workers=16):
-    with multiprocessing.Pool(num_workers) as p:
-        inchi_list = p.map(_convert_smiles_to_inchi, smiles_list, chunksize=128)
-    n_success = sum([x is not None for x in inchi_list])
-    r_success = n_success / len(inchi_list)
-    inchi_list = [x if x else 'InChI=1S/H2O/h1H2' for x in inchi_list]
-    return inchi_list, r_success
-
-
-def merge_inchi(inchi1, inchi2):
-    replaced = 0
-    inchi1 = copy.deepcopy(inchi1)
-    for i in range(len(inchi1)):
-        if inchi1[i] == 'InChI=1S/H2O/h1H2':
-            inchi1[i] = inchi2[i]
-            replaced += 1
-    return inchi1, replaced
-
-
-def _get_num_atoms(smiles):
-    try:
-        return Chem.MolFromSmiles(smiles).GetNumAtoms()
-    except:
-        return 0
-
-
-def get_num_atoms(smiles, num_workers=16):
-    if type(smiles) is str:
-        return _get_num_atoms(smiles)
-    with multiprocessing.Pool(num_workers) as p:
-        num_atoms = p.map(_get_num_atoms, smiles)
-    return num_atoms
 
 
 def normalize_nodes(nodes, flip_y=True):
+    """
+    Normalize node coordinates to [0, 1] range.
+
+    Args:
+        nodes (np.ndarray): Shape (N, 2) array of (x, y) coordinates.
+        flip_y (bool): If True, flip y-axis. Default True.
+
+    Returns:
+        np.ndarray: Normalized coordinates of shape (N, 2).
+    """
     x, y = nodes[:, 0], nodes[:, 1]
     minx, maxx = min(x), max(x)
     miny, maxy = min(y), max(y)
@@ -82,6 +39,19 @@ def normalize_nodes(nodes, flip_y=True):
 
 
 def _verify_chirality(mol, coords, symbols, edges, debug=False):
+    """
+    Assign chirality and stereochemistry to a molecule using 2D coordinates and bond directions.
+
+    Args:
+        mol (Chem.RWMol): Editable molecule object.
+        coords (list): 2D coordinates for each atom.
+        symbols (list[str]): Atom symbols.
+        edges (np.ndarray): Adjacency matrix with bond type encoding.
+        debug (bool): If True, re-raise exceptions. Default False.
+
+    Returns:
+        Chem.Mol: Molecule with chirality assigned.
+    """
     try:
         n = mol.GetNumAtoms()
         # Make a temp mol to find chiral centers
@@ -382,6 +352,12 @@ def get_smiles_from_symbol(symbol, mol, atom, bonds,abb = None):
 
 
 def _replace_functional_group(smiles):
+    """
+    Replace R-groups and unknown tokens in SMILES with wildcard placeholders.
+
+    Returns:
+        tuple[str, dict]: Processed SMILES and isotope-to-symbol mapping for unknowns.
+    """
     smiles = smiles.replace('<unk>', 'C')
     for i, r in enumerate(RGROUP_SYMBOLS):
         symbol = f'[{r}]'
@@ -423,6 +399,18 @@ BOND_TYPES = {1: Chem.rdchem.BondType.SINGLE, 2: Chem.rdchem.BondType.DOUBLE, 3:
 
 
 def _expand_functional_group(mol, mappings, debug=False,abb=None):
+    """
+    Expand abbreviation/condensed formula placeholders in a molecule into full substructures.
+
+    Args:
+        mol (Chem.Mol): Input molecule with placeholder atoms.
+        mappings (dict): Isotope-to-symbol mapping from _replace_functional_group.
+        debug (bool): If True, re-raise exceptions. Default False.
+        abb (dict, optional): Custom abbreviation set. Default None.
+
+    Returns:
+        tuple[str, Chem.Mol]: Canonical SMILES and expanded molecule.
+    """
     def _need_expand(mol, mappings):
         return any([len(Chem.GetAtomAlias(atom)) > 0 for atom in mol.GetAtoms()]) or len(mappings) > 0
 
@@ -510,7 +498,16 @@ def _expand_functional_group(mol, mappings, debug=False,abb=None):
 
     
 def resolve_abbreviations_simplified(molecule, abbreviations_smiles_mapping):
-    
+    """
+    Iteratively expand all abbreviation atoms in a molecule using a SMILES mapping.
+
+    Args:
+        molecule (Chem.Mol): Input molecule with aliased abbreviation atoms.
+        abbreviations_smiles_mapping (dict): Mapping from abbreviation to {'smiles': str}.
+
+    Returns:
+        Chem.Mol: Molecule with abbreviations expanded.
+    """
     
     current_molecule = molecule
     max_iterations = 10 
@@ -555,7 +552,18 @@ def resolve_abbreviations_simplified(molecule, abbreviations_smiles_mapping):
 
 
 def process_single_abbreviation(molecule, atom_idx, alias, smiles):
-    
+    """
+    Replace a single abbreviation atom with its corresponding substructure.
+
+    Args:
+        molecule (Chem.Mol): Input molecule.
+        atom_idx (int): Index of the abbreviation atom to replace.
+        alias (str): Expected alias of the atom.
+        smiles (str): SMILES of the abbreviation's substructure.
+
+    Returns:
+        Chem.Mol | None: Updated molecule, or None on failure.
+    """
     from rdkit import Chem
     
    
@@ -604,7 +612,18 @@ def process_single_abbreviation(molecule, atom_idx, alias, smiles):
 
 
 def process_abbreviation_molecule(abbreviation_mol):
-    
+    """
+    Extract the core structure and connection points from an abbreviation molecule.
+
+    Removes wildcard (*) atoms and identifies their neighbors as connection points.
+
+    Args:
+        abbreviation_mol (Chem.Mol): Molecule with * atoms marking attachment sites.
+
+    Returns:
+        tuple[Chem.Mol, list[dict]] | None: Core molecule and connection point info,
+                                            or None on failure.
+    """
     from rdkit import Chem
     
     
@@ -688,7 +707,19 @@ def process_abbreviation_molecule(abbreviation_mol):
 
 
 def build_new_molecule(original_mol, target_atom_idx, neighbor_bonds, abbr_mol, connection_points):
-    
+    """
+    Replace a target atom with an abbreviation substructure, preserving chirality.
+
+    Args:
+        original_mol (Chem.Mol): The original molecule.
+        target_atom_idx (int): Index of atom to be replaced.
+        neighbor_bonds (list[dict]): Bond info for each neighbor of the target atom.
+        abbr_mol (Chem.Mol): Core structure of the abbreviation.
+        connection_points (list[dict]): Attachment atoms in abbr_mol.
+
+    Returns:
+        Chem.Mol | None: New molecule with abbreviation expanded, or None on failure.
+    """
     from rdkit import Chem
     
     try:

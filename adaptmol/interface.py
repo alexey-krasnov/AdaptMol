@@ -86,6 +86,23 @@ class AdaptMol:
         return encoder, decoder
 
     def predict_images(self, input_images: List, return_atoms_bonds=False, return_confidence=False, batch_size=16):
+        """
+        Run end-to-end prediction on a list of molecular structure images.
+
+        Args:
+            input_images (List): Input images as numpy arrays (H, W, C).
+            return_atoms_bonds (bool): If True, include per-atom and per-bond info in output. Default False.
+            return_confidence (bool): If True, include confidence scores. Default False.
+            batch_size (int): Number of images per inference batch. Default 16.
+
+        Returns:
+            list[dict]: One dict per image with keys:
+                - 'smiles' (str): Predicted SMILES.
+                - 'molfile' (str): Predicted molblock.
+                - 'confidence' (float, optional): Overall prediction confidence.
+                - 'atoms' (list[dict], optional): Per-atom symbol, coordinates, and confidence.
+                - 'bonds' (list[dict], optional): Per-bond type, endpoint indices, and confidence.
+        """
         device = self.device
         predictions = []
         self.decoder.compute_confidence = return_confidence

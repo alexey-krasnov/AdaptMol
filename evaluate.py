@@ -35,6 +35,19 @@ def get_args():
 
 
 def canonicalize_smiles(smiles, ignore_chiral=False, ignore_cistrans=False, replace_rgroup=True):
+    """
+    Canonicalize a SMILES string using RDKit.
+
+    Args:
+        smiles (str): Input SMILES string.
+        ignore_chiral (bool): If True, ignore chirality during canonicalization. Default False.
+        ignore_cistrans (bool): If True, remove cis/trans bond notation ('/' and '\\'). Default False.
+        replace_rgroup (bool): If True, replace R-group tokens (e.g. [R1]) with wildcard atoms. Default True.
+
+    Returns:
+        tuple[str, bool]: Canonicalized SMILES and a success flag.
+                          Returns ('', False) if input is invalid or empty.
+    """
     if type(smiles) is not str or smiles == '' or pd.isna(smiles) or smiles == "" or str(smiles) == "nan":
         return '', False
     if ignore_cistrans:
@@ -74,6 +87,16 @@ def convert_smiles_to_canonsmiles(
 
 
 def _keep_main_molecule(smiles, debug=False):
+    """
+    Retain only the largest fragment from a SMILES string.
+
+    Args:
+        smiles (str): Input SMILES, potentially containing multiple fragments (e.g. salts).
+        debug (bool): Unused, reserved for future debug logging. Default False.
+
+    Returns:
+        str: SMILES of the largest fragment by atom count, or the original string if parsing fails.
+    """
     try:
         mol = Chem.MolFromSmiles(smiles)
         frags = Chem.GetMolFrags(mol, asMols=True)
@@ -93,6 +116,16 @@ def keep_main_molecule(smiles, num_workers=2):
 
 
 def tanimoto_similarity(smiles1, smiles2):
+    """
+    Compute Tanimoto similarity between two molecules using RDKit fingerprints.
+
+    Args:
+        smiles1 (str): SMILES string of the first molecule.
+        smiles2 (str): SMILES string of the second molecule.
+
+    Returns:
+        float: Tanimoto similarity score in [0, 1], or 0 if either molecule fails to parse.
+    """
     try:
         mol1 = Chem.MolFromSmiles(smiles1)
         mol2 = Chem.MolFromSmiles(smiles2)
@@ -122,6 +155,7 @@ def convert_molfile_to_canonsmiles(
             smiles= "C"
         smiless.append(smiles)
     return smiless
+    
 def molfile_to_smiles(mol_path):
     try :
         mol = Chem.MolFromMolFile(mol_path, sanitize =True)

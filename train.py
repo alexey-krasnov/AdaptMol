@@ -610,7 +610,19 @@ def train_loop(args, train_df, valid_df, aux_df, tokenizer, save_path, our_valid
     if args.local_rank != -1:
         dist.barrier()
 def build_mol_paths(data_path, image_names, dataset_type):
+    """
+    Build full file paths to molecule reference files for a given dataset.
 
+    Args:
+        data_path (str): Root data directory.
+        image_names (list[str]): List of image base names (without extension).
+        dataset_type (str): Dataset CSV filename used as key to determine the
+                            subdirectory and file extension (e.g. "USPTO.csv", "JPO.csv").
+
+    Returns:
+        list[str] | None: List of full paths to molecule files, or None if
+                          dataset_type is not recognized.
+    """
 
     dataset_extensions = {
         "USPTO.csv": ".MOL",
@@ -655,6 +667,13 @@ def build_mol_paths(data_path, image_names, dataset_type):
     
     return mol_paths
 def getabbr():
+    """
+    Load chemical abbreviation-to-SMILES mappings from a JSON file.
+
+    Returns:
+        dict: A dictionary mapping each abbreviation (str) to a dict with key 'smiles' (str),
+              e.g. {"Et": {"smiles": "CC"}, ...}
+    """
     abbreviations_smiles_mapping= {}
     with open( "adaptmol/abbreviations.json", "r") as file:
         abbreviations_smiles = json.load(file)
@@ -810,6 +829,32 @@ def inference(args, data_df, tokenizer, encoder=None, decoder=None, save_path=No
 
 
 def get_chemdraw_data(args):
+    """
+    Load ChemDraw datasets and tokenizer based on the provided arguments.
+
+    Args:
+        args: Argument object containing:
+            - do_train (bool): Whether to load training data.
+            - do_valid (bool): Whether to load validation data.
+            - do_test (bool): Whether to load test data.
+            - data_path (str): Root directory of all data files.
+            - train_file (str): Comma-separated training CSV filenames.
+            - valid_file (str): Validation CSV filename.
+            - test_file (str): Comma-separated test CSV filenames.
+            - aux_file (str, optional): Auxiliary CSV filename.
+            - validation_file (str, optional): Additional validation CSV filename.
+            - mmd_file (str, optional): MMD CSV filename.
+
+    Returns:
+        tuple: (train_df, valid_df, test_df, aux_df, tokenizer, validation_df, mmd_df)
+            - train_df (pd.DataFrame | None): Concatenated training data.
+            - valid_df (pd.DataFrame | None): Validation data.
+            - test_df (list[pd.DataFrame] | None): List of test DataFrames.
+            - aux_df (pd.DataFrame | None): Auxiliary training data.
+            - tokenizer: Tokenizer instance from get_tokenizer().
+            - validation_df (pd.DataFrame | None): Additional validation data.
+            - mmd_df (pd.DataFrame | None): MMD data.
+    """
     train_df, valid_df, test_df, aux_df, validation_df, mmd_df  = None, None, None, None, None, None
     if args.do_train:
         train_files = args.train_file.split(',')
@@ -844,6 +889,19 @@ def get_chemdraw_data(args):
     return train_df, valid_df, test_df, aux_df, tokenizer, validation_df,mmd_df
 
 def read_pesudo_lable(json_file, csv_file):
+    """
+    Read and filter pseudo-label data from two JSON index files and two CSV files.
+
+    Args:
+        json_file (str): Comma-separated paths to two JSON files, each containing
+                        a 'correct' field with valid image_id lists.
+        csv_file (str): Comma-separated paths to two CSV files, each containing
+                        columns: 'image_id', 'node_symbols', 'node_coords', 'edges', 'file_path'.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: Two filtered DataFrames retaining only
+        ['node_symbols', 'node_coords', 'edges', 'file_path'] columns.
+    """
     index =  json_file.split(',')
     csvfiles = csv_file.split(',')
 

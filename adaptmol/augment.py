@@ -10,7 +10,15 @@ import numpy as np
 
 
 class CropWhite(A.DualTransform):
-    
+    """
+    Albumentations transform that crops white (or specified color) borders from an image
+    and applies uniform padding.
+
+    Args:
+        value (tuple): Background color to crop, default (255, 255, 255).
+        pad (int): Padding to add after cropping. Default 0.
+        p (float): Probability of applying the transform. Default 1.0.
+    """
     def __init__(self, value=(255,255,255), pad=0, p=1.0):
         super(CropWhite, self).__init__(p=p)
         self.value = value
@@ -69,6 +77,14 @@ class CropWhite(A.DualTransform):
 
 
 class SaltAndPepperNoise(A.DualTransform):
+    """
+    Randomly scatter fixed-color dots across an image to simulate salt-and-pepper noise.
+
+    Args:
+        num_dots (int): Maximum number of noise dots to add.
+        value (tuple): Color of the noise dots. Default (0, 0, 0).
+        p (float): Probability of applying the transform. Default 0.5.
+    """
 
     def __init__(self, num_dots, value=(0, 0, 0), p=0.5):
         super().__init__(p)

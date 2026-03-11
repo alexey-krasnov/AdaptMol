@@ -6,7 +6,30 @@ import torch.nn.functional as F
 
 
 class SequenceHeatmapGenerator(nn.Module):
-    
+    """
+    Generates spatial heatmaps from sequence logits by modeling joint distributions
+    of x/y coordinate tokens.
+
+    Args:
+        vocab_size (int): Total vocabulary size.
+        target_height (int): Output heatmap height in pixels. Default 256.
+        target_width (int): Output heatmap width in pixels. Default 256.
+        x_token_start (int): Vocab index where x-coordinate tokens begin. Default 101.
+        x_token_end (int): Vocab index where x-coordinate tokens end. Default 165.
+        y_token_start (int): Vocab index where y-coordinate tokens begin. Default 165.
+        start_token (int): Index of the sequence start token. Default 1.
+        aggregation (str): Heatmap aggregation strategy, one of
+                           'direct_pairs', 'weighted_pairs', or 'attention'. Default 'direct_pairs'.
+        significance_threshold (float): Threshold for filtering low-confidence predictions. Default 0.3.
+
+    Forward Args:
+        seq_logits (Tensor): Shape (B, T, V) — batch of sequence logits.
+        return_details (bool): If True, also return a dict with intermediate outputs. Default False.
+
+    Forward Returns:
+        Tensor: Heatmap of shape (B, 1, target_height, target_width).
+        
+    """
     
     def __init__(self, vocab_size, target_height=256, target_width=256, 
                  x_token_start=101, x_token_end=165, y_token_start=165, 
@@ -89,6 +112,17 @@ class SequenceHeatmapGenerator(nn.Module):
         return heatmap
     
     def _generate_heatmap_from_pairs(self, x_probs, y_probs, probs):
+        """
+        Generate heatmap from joint distribution of consecutive x/y token pairs.
+
+        Args:
+            x_probs (Tensor): Shape (B, T, x_range).
+            y_probs (Tensor): Shape (B, T, y_range).
+            probs (Tensor): Full vocab probs (B, T, V), reserved for future use.
+
+        Returns:
+            Tensor: Heatmap of shape (B, 1, target_height, target_width).
+        """
         
         B, T, _ = x_probs.shape
         device = x_probs.device

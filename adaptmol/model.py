@@ -13,6 +13,13 @@ from .transformer import TransformerDecoder, Embeddings
 from .heatmap_generator.heatmap_model import SequenceHeatmapGenerator
 
 class Encoder(nn.Module):
+    """
+    Image encoder supporting ResNet, EfficientNet, and Swin Transformer backbones.
+
+    Args:
+        args: Arguments with 'encoder' (model name) and 'use_checkpoint' fields.
+        pretrained (bool): If True, load pretrained weights. Default False.
+    """
     def __init__(self, args, pretrained=False):
         super().__init__()
         model_name = args.encoder
@@ -39,6 +46,16 @@ class Encoder(nn.Module):
             raise NotImplemented
 
     def swin_forward(self, transformer, x):
+        """
+        Custom Swin Transformer forward pass that returns intermediate layer outputs.
+
+        Args:
+            transformer: Swin Transformer model instance.
+            x (Tensor): Input image tensor.
+
+        Returns:
+            tuple[Tensor, list[Tensor]]: Final features and list of per-layer hidden states.
+        """
         x = transformer.patch_embed(x)
         if transformer.absolute_pos_embed is not None:
             x = x + transformer.absolute_pos_embed
@@ -65,6 +82,16 @@ class Encoder(nn.Module):
         return x, hiddens
 
     def forward(self, x, refs=None):
+        """
+        Encode input images into spatial feature maps.
+
+        Args:
+            x (Tensor): Input image batch of shape (B, C, H, W).
+            refs: Unused. Default None.
+
+        Returns:
+            tuple[Tensor, list[Tensor]]: Feature map (B, H, W, C) and list of hidden states.
+        """
         if self.model_type in ['resnet', 'efficientnet']:
             features = self.cnn(x)
             features = features.permute(0, 2, 3, 1)
@@ -311,6 +338,14 @@ class TransformerDecoderAR(TransformerDecoderBase):
 
 
 class GraphPredictor(nn.Module):
+    """
+    Predicts bond types (and optionally coordinates) from atom-level decoder hidden states,
+    with optional cross-attention over image features.
+
+    Args:
+        decoder_dim (int): Hidden state dimensionality. Default 256.
+        coords (bool): If True, also predict 2D atom coordinates. Default False.
+    """
     
     def __init__(self, decoder_dim=256, coords=False):
         super().__init__()
@@ -344,7 +379,20 @@ class GraphPredictor(nn.Module):
         self.query_proj = nn.Linear(decoder_dim, decoder_dim)
 
     def forward(self, hidden, memory_bank=None, indices=None):
-       
+        """
+        Args:
+            hidden (Tensor): Decoder hidden states of shape (B, L, D).
+            memory_bank (Tensor, optional): Image feature bank of shape (B, S, D)
+                                            for cross-attention. Default None.
+            indices (Tensor, optional): Atom token indices into hidden, shape (B, n_atoms).
+                                        If None, every 3rd token starting at position 3 is used.
+
+        Returns:
+            dict: 
+                - 'edges' (Tensor): Bond logits of shape (B, 7, n_atoms, n_atoms).
+                - '_atom_pairs' (Tensor): Pairwise atom features of shape (B, n_atoms, n_atoms, D).
+                - 'coords' (Tensor, optional): Predicted coordinates (B, n_atoms, 2), if coords=True.
+        """
         b, l, dim = hidden.size()
         
        
@@ -402,6 +450,22 @@ class GraphPredictor(nn.Module):
 
 
 def get_edge_prediction(edge_prob):
+    """
+    Symmetrize edge probabilities and return predicted bond types and confidence scores.
+
+    Averages symmetric bond probabilities, with special handling for directional
+    stereo bonds (types 5 and 6, i.e. wedge/dash).
+
+    Args:
+        edge_prob (list): Shape (n, n, 7) nested list of per-bond-type probabilities.
+
+    Returns:
+        tuple[list, list, list]: 
+            - prediction: (n, n) argmax bond type indices.
+            - score: (n, n) max probabilities.
+            - edge_prob: Symmetrized probability array.
+            Returns ([], [], []) if input is empty.
+    """
     if not edge_prob:
         return [], [],[]
     n = len(edge_prob)

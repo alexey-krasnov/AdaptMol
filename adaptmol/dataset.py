@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from .augment import  CropWhite,SaltAndPepperNoise
 from .utils import FORMAT_INFO, print_rank_0
 from .tokenizer import PAD_ID
-from .chemistry import get_num_atoms, normalize_nodes
+from .chemistry import  normalize_nodes
 from .constants import RGROUP_SYMBOLS, SUBSTITUTIONS, ELEMENTS, COLORS
 from .parsinglabels import *
 import json
@@ -35,6 +35,20 @@ INDIGO_COLOR_PROB = 0.2
 
 
 def get_transforms(input_size, augment=False, rotate=False, debug=False, pad=20,need_crop=True):
+    """
+    Build an Albumentations transform pipeline for image preprocessing.
+
+    Args:
+        input_size (int): Target image size (square).
+        augment (bool): If True, add downscale, blur, and noise augmentations. Default False.
+        rotate (bool): Unused, reserved. Default False.
+        debug (bool): If True, skip normalization and tensor conversion. Default False.
+        pad (int): Padding for CropWhite transform. Default 20.
+        need_crop (bool): If True, apply CropWhite. Default True.
+
+    Returns:
+        A.Compose: Composed transform pipeline with keypoint support.
+    """
     trans_list = []
     
     if need_crop:
@@ -58,6 +72,15 @@ def get_transforms(input_size, augment=False, rotate=False, debug=False, pad=20,
     return A.Compose(trans_list, keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
 
 def get_our_transforms( debug=False):
+    """
+    Build a minimal transform pipeline (grayscale, normalize, to tensor).
+
+    Args:
+        debug (bool): If True, skip all transforms. Default False.
+
+    Returns:
+        A.Compose: Composed transform pipeline with keypoint support.
+    """
     trans_list = []
     if not debug:
         mean = [0.485, 0.456, 0.406]
@@ -74,7 +97,17 @@ def get_our_transforms( debug=False):
 
 
 def process_atom_tokens(token_list):
-   
+    """
+    Filter and clean atom tokens from a tokenized SMILES list.
+
+    Keeps only atom tokens and strips chirality annotations (e.g. [C@@H] -> C).
+
+    Args:
+        token_list (list[str]): Atomwise-tokenized SMILES tokens.
+
+    Returns:
+        list[str]: Cleaned atom symbol list.
+    """
     UNK = '<unk>'  
     
     def is_atom_token(token):
@@ -110,6 +143,17 @@ def process_atom_tokens(token_list):
     return result
 
 def process_tokens(tokens):
+    """
+    Normalize wildcard and R-group tokens to a standard format.
+
+    Converts [*] -> [R], * -> R, and [n*] -> [Rn].
+
+    Args:
+        tokens (list[str]): List of SMILES tokens.
+
+    Returns:
+        list[str]: Tokens with normalized R-group representations.
+    """
     result = []
     for token in tokens:
        
@@ -125,6 +169,17 @@ def process_tokens(tokens):
 
 
 def sort_by_coordinates(atoms_list, coordinates, bonds_list):
+    """
+    Sort atoms and bonds by (y, x) coordinate order.
+
+    Args:
+        atoms_list (list[str]): Atom symbols.
+        coordinates (list): Atom (x, y) coordinates.
+        bonds_list (list): Bond records as [atom1_idx, atom2_idx, bond_type].
+
+    Returns:
+        tuple: Sorted atoms, coordinates (np.ndarray), and updated bond list.
+    """
     coords_array = np.array(coordinates)
     indices = np.arange(len(atoms_list))
     sorted_indices = np.lexsort((coords_array[:, 0], coords_array[:, 1]))
@@ -142,6 +197,23 @@ def sort_by_coordinates(atoms_list, coordinates, bonds_list):
     return sorted_atoms, sorted_coordinates, updated_bonds    
 
 class TrainDataset(Dataset):
+    """
+    Dataset for molecular structure recognition training.
+
+    Loads images, coordinates, atom labels, and bond graphs from CSV data,
+    applies image transforms, and encodes labels into tokenized sequences.
+
+    Args:
+        args: Training arguments including data_path, input_size, formats, etc.
+        df (pd.DataFrame): Data DataFrame with image paths and label columns.
+        tokenizer (dict): Format-keyed tokenizer instances.
+        split (str): 'train' or other split name. Default 'train'.
+        dynamic_indigo (bool): If True, use dynamic Indigo rendering. Default False.
+        aux (bool): If True, treat as auxiliary dataset. Default False.
+        psudo_label (bool): If True, use pseudo-labeled data. Default False.
+        pad (int): Padding for CropWhite. Default 20.
+        need_crop (bool): If True, apply CropWhite. Default True.
+    """
     def __init__(self, args, df, tokenizer, split='train', dynamic_indigo=False,aux =False, psudo_label=False,pad = 20,need_crop=True):
         super().__init__()
         self.df = df
@@ -206,12 +278,14 @@ class TrainDataset(Dataset):
     def __len__(self):
         return len(self.df)
     def our_image_transform(self, image, coords=[], renormalize=False):
+        """Apply minimal transform (no augmentation) to image."""
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # .astype(np.float32)
         augmented = self.out_transform(image=image, keypoints=coords)
         image = augmented['image']
         
         return image
     def image_transform(self, image, coords=[], renormalize=False):
+        """Apply augmentation transform and optionally normalize coordinates."""
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # .astype(np.float32)
         augmented = self.transform(image=image, keypoints=coords)
         image = augmented['image']
@@ -248,6 +322,7 @@ class TrainDataset(Dataset):
                     
                     raise e
     def getitem(self, idx):
+        """Load and process a single sample: image, coords, labels, heatmap, and sequences."""
         ref = {}
     
     
@@ -381,6 +456,7 @@ class TrainDataset(Dataset):
                 ref['edges'] = torch.ones(len(indices), len(indices), dtype=torch.long) * (-100)
 
     def _process_chartok_coords(self, idx, ref, smiles, coords=None, edges=None, mask_ratio=0, bond_list = None):
+        """Encode character-tokenized SMILES with coordinates and bond graph into ref dict."""
         max_len = FORMAT_INFO['chartok_coords']['max_len']
         tokenizer = self.tokenizer['chartok_coords']
         if smiles is None:
@@ -457,6 +533,7 @@ class TrainDataset(Dataset):
 
 
     def add_gaussian(self, input, keypoint, sigma):
+        """Add a 2D Gaussian blob centered at a keypoint to a heatmap tensor."""
         tmp_size = sigma * 3
 
         # Top-left
@@ -486,6 +563,7 @@ class TrainDataset(Dataset):
         return input
 
     def generate_heatmap(self, keypoints,h,w):
+        """Generate a 256x256 Gaussian heatmap from a list of keypoints."""
         sigma = 1
         keypoints = keypoints.copy()
         keypoints[:, 0] = keypoints[:, 0] * (256 / w)
@@ -517,6 +595,15 @@ class AuxTrainDataset(Dataset):
 
 
 def pad_images(imgs):
+    """
+    Pad a list of image tensors to the same spatial dimensions.
+
+    Args:
+        imgs (list[Tensor]): Image tensors of shape (C, H, W).
+
+    Returns:
+        Tensor: Stacked and zero-padded batch of shape (B, C, H, W).
+    """
     # B, C, H, W
     max_shape = [0, 0]
     for img in imgs:
