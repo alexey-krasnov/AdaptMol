@@ -27,7 +27,7 @@ Download our pretrained model from: [model](https://huggingface.co/fffh1/AdaptMo
 conda env create -f environment.yml
 conda activate adaptmol
 ```
-### Option 2: Docker 
+### Option 2: pip 
 We are using Python 3.8 
 ```bash
 pip install -r requirements.txt
