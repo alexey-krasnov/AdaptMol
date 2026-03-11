@@ -13,11 +13,11 @@ If you use our work in your research, please cite:
 
 ## Dataset
 
-The dataset used in this work is available at: [data(link)](data_link_here)
+The dataset used in this work is available at: [train](https://huggingface.co/fffh1/AdaptMol/blob/main/train.tar.gz) [evaluation](https://huggingface.co/fffh1/AdaptMol/blob/main/evaluate.tar.gz)
 
 ## Pretrained Model
 
-Download our pretrained model from: [model(link)](model_link_here)
+Download our pretrained model from: [model](https://huggingface.co/fffh1/AdaptMol/blob/main/pretrained.pth)
 
 ## Installation
 
