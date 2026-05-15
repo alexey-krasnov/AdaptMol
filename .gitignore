@@ -1,0 +1,14 @@
+**/.ipynb_checkpoints/
+data/
+output/
+notebook/
+scripts/
+*.log
+**/__pycache__
+*.csv
+tmp/
+**/checkpoints/
+**/.DS_Store
+*.egg-info
+models/
+notebooks/
