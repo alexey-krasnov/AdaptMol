@@ -12,3 +12,5 @@ tmp/
 *.egg-info
 models/
 notebooks/
+__pycache__/
+*.pyc
